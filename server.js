@@ -254,6 +254,8 @@ app.use(require('forest-express-mongoose').init({
   mongoose: mongoose
 }));
 
-var server = app.listen(3000, () => {
+const port = (process.env.PORT || 3000)
+
+var server = app.listen(port, () => {
   console.log('server is running at:', server.address());
 });
