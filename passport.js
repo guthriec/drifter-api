@@ -15,7 +15,6 @@ jwtOptions.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
 jwtOptions.secretOrKey = process.env.JWT_SECRET;
 
 passport.use(new JwtStrategy(jwtOptions, function(jwt_payload, done) {
-  console.log(jwt_payload.id);
   User.findById(jwt_payload.id)
   .then(user => {
     if (user) {
@@ -39,7 +38,6 @@ passport.use(new LocalStrategy({
       if (!user) {
         return done(null, false, {message: 'No user found for that username'});
       }
-      console.log(user)
       if (bcrypt.compareSync(password, user.password)) {
         return done(null, user, {message: 'Logged in successfully'});
       } else {

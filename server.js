@@ -46,10 +46,9 @@ app.use(passport.initialize());
 app.get('/messages',
         passport.authenticate('jwt', {session: false}),
         function(req, res) {
-  console.log("Getting messages for user: ", req.user);
   Message.find({ recipient: req.user._id }, function(err, messages) {
     if (err) {
-      console.log(err);
+      console.log("Message get error: ", err);
       res.status(500).send("Error retrieving messages");
     } else {
       res.status(200).json(messages);
@@ -62,10 +61,9 @@ app.post('/messages',
          function(req, res) {
   User.findOne({ username: req.body.recipient }, function(err, recipient) {
     if (err) {
-      console.log(err);
+      console.log("Message findOne error in post: ", err);
       res.status(500).send("Couldn't get user by name");
     } else {
-      console.log("message recipient: ", recipient)
       Message.create({
         sender: req.user._id,
         recipient: recipient._id,
@@ -73,7 +71,7 @@ app.post('/messages',
         resources: req.body.resourceIds
       }, function(err, message) {
         if (err) {
-          console.log(err);
+          console.log("Message create error: ", err);
           res.status(500).send("Error creating message");
         } else {
           res.status(201).json(message);
@@ -89,7 +87,7 @@ passport.authenticate('jwt', {session: false}),
 function(req, res) {
   Message.findById(req.params.messageId, function(err, message) {
     if(err) {
-      console.log(err);
+      console.log("Message find error in delete: ", err);
       res.status(500).send("Error retrieving specified message");
     } else {
       var isAuthorized = false;
@@ -106,7 +104,7 @@ function(req, res) {
       }
       Message.deleteOne({ _id: message._id }, function(err) {
         if (err) {
-          console.log(err);
+          console.log("Message delete error: ", err);
           res.status(500).send("Error deleting specified message");
         } else {
           res.status(200).json({success: true});
@@ -121,7 +119,7 @@ app.get('/messages/:messageId/resources',
         function(req, res) {
   Message.findById(req.params.messageId, function(err, message) {
     if (err) {
-      console.log(err);
+      console.log("Message find error in resources: ", err);
       res.status(500).send("Error finding that message");
     } else if (!(req.user._id.equals(message.recipient))) {
       res.status(401).send("Unauthorized");
@@ -134,8 +132,6 @@ app.get('/messages/:messageId/resources',
           var s3Promises = [];
           for (var i=0; i < resources.length; i++) {
             var resource = resources[i]
-            console.log(resource);
-            console.log(resource.key);
             var s3Promise = new Promise(function(resolve, reject) {
               var s3Params = {
                 Bucket: 'drifter-images',
@@ -169,7 +165,6 @@ app.get('/messages/:messageId/resources',
 app.post('/resources',
          passport.authenticate('jwt', {session: false}),
          function(req, res) {
-  console.log("in resource post!!")
   var data = req.body.data;
   const key = req.user._id + '-' + crypto.randomBytes(12).toString("hex");
   var s3Params = {
@@ -187,10 +182,10 @@ app.post('/resources',
         creator: req.user._id
       }, function(err, resource) {
         if (err) {
-          console.log(err);
+          console.log("Resource create error: ", err);
           res.status(500).send("Resource Creation Error");
         } else {
-          res.status(200).json({success: true, resourceId: resource._id});
+          res.status(201).json({success: true, resourceId: resource._id});
         }
       });
     }
@@ -203,13 +198,11 @@ app.delete('/current-user',
   res.json({ message: 'can\'t find current user'})
 })
 
-function signAndSendJWT(res, user) {
+function signAndSendJWT(res, user, status = 200) {
   var token = jwt.sign({id: user._id}, process.env.JWT_SECRET, {
     expiresIn: 60*60*24
   });
-  console.log("Signing JWT for user: ", user);
-  console.log("JWT: ", token);
-  res.status(200).json({auth: true, token: token});
+  res.status(status).json({auth: true, token: token});
 }
 
 app.post('/login',
@@ -226,7 +219,7 @@ app.post('/register', function(req, res) {
     password: hashedPassword
   }, function(err, user) {
     if (err) {
-      console.log(err);
+      console.log("User create error: ", err);
       var resCode = 500;
       var message = "Internal error registering user.";
       if (err.code == 11000) {
@@ -235,7 +228,7 @@ app.post('/register', function(req, res) {
       }
       return res.status(resCode).send(message);
     } else {
-      signAndSendJWT(res, user);
+      signAndSendJWT(res, user, 201);
     }
   });
 })
@@ -247,12 +240,28 @@ app.get('/users', function(req, res) {
   };
   User.find(dbQuery, function(err, users) {
     if (err) {
-      console.log(err);
+      console.log("User find error: ", err);
       var resCode = 500;
-      var message = "Internal error finding users."
-      return res.status(resCode).send(message)
+      var message = "Internal error finding users.";
+      return res.status(resCode).send(message);
     } else {
-      return res.status(200).json(users)
+      return res.status(200).json(users);
+    }
+  });
+})
+
+app.get('/exact-user', function(req, res) {
+  var queryName = req.query.q;
+  User.findOne({username: queryName}, function(err, user) {
+    if (err) {
+      console.log("Exact user find error: ", err);
+      var resCode = 500;
+      var message = "Internal error determining username availability.";
+      return res.status(resCode).send(message);
+    } else if (user) {
+      return res.status(200).json(user);
+    } else {
+      return res.status(404).send("No matching user found");
     }
   });
 })
@@ -267,5 +276,5 @@ app.use(require('forest-express-mongoose').init({
 const port = (process.env.PORT || 3000)
 
 var server = app.listen(port, () => {
-  console.log('server is running at:', server.address());
+  console.log('server is running at: ', server.address());
 });

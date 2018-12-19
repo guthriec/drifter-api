@@ -15,11 +15,13 @@ var UserSchema = new Schema({
   },
   firstName: {
     type: String,
-    default: ""
+    default: "",
+    maxLength: 20
   },
   lastName: {
     type: String,
-    default: ""
+    default: "",
+    maxLength: 20
   },
   password: {
     type: String,
