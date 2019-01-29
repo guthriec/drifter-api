@@ -79,7 +79,6 @@ app.post('/messages',
       });
     }
   });
-
 });
 
 app.delete('/messages/:messageId',
@@ -89,7 +88,7 @@ function(req, res) {
     if(err) {
       console.log("Message find error in delete: ", err);
       res.status(500).send("Error retrieving specified message");
-    } else {
+    } else if (message) {
       var isAuthorized = false;
       var authorizedDeleters = [];
       authorizedDeleters.push(message.recipient);
@@ -110,6 +109,8 @@ function(req, res) {
           res.status(200).json({success: true});
         }
       });
+    } else {
+      res.status(404).send("No such message");
     }
   });
 });
@@ -192,6 +193,23 @@ app.post('/resources',
   });
 });
 
+app.post('/current-user',
+  passport.authenticate('jwt', {session: false}),
+  function(req, res) {
+    User.findOneAndUpdate({ username: req.body.username },
+      { firstName: req.body.firstName, lastName: req.body.lastName },
+      { new: true },
+      function(err, currUser) {
+        if (err) {
+          console.log("Message findOneAndUpdate error in post: ", err);
+          res.status(500).send("Couldn't get user by name");
+        } else {
+          res.status(200).send(currUser);
+        }
+    });
+  }
+)
+
 app.delete('/current-user',
             passport.authenticate('jwt', {session: false}),
             function(req, res) {
@@ -234,11 +252,15 @@ app.post('/register', function(req, res) {
 })
 
 app.get('/users', function(req, res) {
-  var usernameQuery = req.query.q;
+  var nameQuery = req.query.q;
   var dbQuery = {
-    username: {$regex: usernameQuery, $options: "i"}
+    $or: [
+      {firstName: {$regex: "^" + nameQuery, $options: "i"}},
+      {lastName: {$regex: "^" + nameQuery, $options: "i"}},
+      {username: {$regex: "^" + nameQuery, $options: "i"}}
+    ]
   };
-  User.find(dbQuery, function(err, users) {
+  User.find(dbQuery).limit(20).exec(function(err, users) {
     if (err) {
       console.log("User find error: ", err);
       var resCode = 500;
